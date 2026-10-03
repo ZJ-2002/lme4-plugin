@@ -1,0 +1,72 @@
+schema_version = 1
+plugin_name = "lme4"
+
+[image]
+reference = "localhost/autonomics/lme4-r@sha256:e224e7fa972342afafac184edad050bd7aec48d8cc206ddf5be1cd30e9d7e18d"
+tag = "v1"
+upstream = "rocker/r-ver 4.4.1 + lme4/lmerTest/pbkrtest/broom.mixed/emmeans (P3M binaries)"
+license = "GPL-2.0|GPL-3.0"
+
+# 说明：普通 LMM/GLMM 拟合（方案 §16.1 B-T 的引擎侧实现：连续时间混合模型、
+# 供者嵌套设计）。区别于引擎已有的 survey 家族（svyglm，横断面加权）：
+# 本家族处理重复测量/嵌套结构的混合效应模型。
+# 输出均为 broom.mixed 的 tidy 口径，便于 DAG 下游 SQL 汇总。
+
+[[nodes]]
+kind = "lme4_fit"
+desc = "Fit an lme4 linear/generalized linear mixed model on a long-format TSV"
+doc = """
+输入：长表 TSV（一行一个观测；分组因子、时间、协变量都在列内）。
+输出三件：
+1) lme4_fixed_effects.tsv —— term/estimate/std.error/df/statistic/p.value/
+   conf.low/conf.high（gaussian 用 lmerTest 的 Satterthwaite 或 Kenward ddf，
+   可 ddf 参数切换；非 gaussian 为 Wald z）；
+2) lme4_random_effects.tsv —— group/name/variance/std.dev（VarCorr 口径）；
+3) lme4_model.txt —— summary 全文、收敛码、singular 提示、模型调用。
+公式用 lme4 语法，例：weight_kg ~ days + (1 | subject_id)、
+value ~ time * group + (time | donor)。
+family=gaussian 走 lmer(REML 可选)；binomial/poisson 走 glmer(nAGQ 可调)。
+规则来源：方案 §16.1——重复数据保留信号×时间项；单独信号主效应通常只反映
+水平差异，不解释为变化速度。失败处理：公式/列名错误 → 退出 2；拟合异常
+（不收敛/奇异）→ 不中止，全文记入 lme4_model.txt 并在 log 标注，由研究者
+决定弃用与否（解释边界：随机方差→0 表示该效应不可识别，不是无变异）。
+seed 供 bootstrap；n_boot>0 时追加 bootstrap 固定效应 CI 列（默认 0 不跑）。
+"""
+timeout_secs = 7200
+artifact_prefix = "/artifacts/lme4_fit"
+
+[nodes.ports]
+inputs = [{ type = "file" }]
+outputs = [
+  { path = "lme4_fixed_effects.tsv", format = "lme4_fixed" },
+  { path = "lme4_random_effects.tsv", format = "lme4_random" },
+  { path = "lme4_model.txt", format = "lme4_model" },
+]
+
+[nodes.params]
+formula = { type = "string", doc = "lme4 formula, e.g. 'y ~ time + (1|subject)'" }
+family = { type = "string", default = "gaussian", doc = "gaussian | binomial | poisson" }
+reml = { type = "bool", default = true, doc = "REML for lmer (ignored by glmer)" }
+ddf = { type = "string", default = "satterthwaite", doc = "satterthwaite | kenward (lmer only)" }
+nagq = { type = "int", default = 1, min = 1.0, doc = "glmer nAGQ points (1 = Laplace)" }
+n_boot = { type = "int", default = 0, min = 0.0, doc = "parametric bootstrap iterations for fixed-effect CIs (0 = off)" }
+seed = { type = "int", default = 42, doc = "R RNG seed" }
+
+[nodes.command]
+interpreter = "Rscript"
+script_file = "scripts/lme4_fit.R"
+
+[nodes.command.env]
+LME4_FORMULA = "{{ formula }}"
+LME4_FAMILY = "{{ family }}"
+LME4_REML = "{{ reml }}"
+LME4_DDF = "{{ ddf }}"
+LME4_NAGQ = "{{ nagq }}"
+LME4_NBOOT = "{{ n_boot }}"
+LME4_SEED = "{{ seed }}"
+
+[nodes.resources]
+network = "isolated"
+cpus = 2
+memory = "8g"
+pull_policy = "never"
