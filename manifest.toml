@@ -19,17 +19,22 @@ doc = """
 输入：长表 TSV（一行一个观测；分组因子、时间、协变量都在列内）。
 输出三件：
 1) lme4_fixed_effects.tsv —— term/estimate/std.error/df/statistic/p.value/
-   conf.low/conf.high（gaussian 用 lmerTest 的 Satterthwaite 或 Kenward ddf，
-   可 ddf 参数切换；非 gaussian 为 Wald z）；
+   conf.low/conf.high（gaussian 用 lmerTest 的 Satterthwaite 或 Kenward-Roger
+   ddf——ddf 参数真正传入 summary 与 tidy（2026-10-05 审计 F10 修复，此前
+   kenward 只改标签未传参）；非 gaussian 为 Wald z）；
 2) lme4_random_effects.tsv —— group/name/variance/std.dev（VarCorr 口径）；
-3) lme4_model.txt —— summary 全文、收敛码、singular 提示、模型调用。
+3) lme4_model.txt —— summary 全文、模型调用，以及末尾机器可读 status 块：
+   status: ok|singular|not-converged|not-converged+singular，附 converged/
+   singular_fit/optimizer_code/lme4_messages 四行（审计 F10 收敛门控；
+   非收敛时输出仍写但 status 显式标注，不得当干净 RUN_PASS 解读）。
 公式用 lme4 语法，例：weight_kg ~ days + (1 | subject_id)、
 value ~ time * group + (time | donor)。
 family=gaussian 走 lmer(REML 可选)；binomial/poisson 走 glmer(nAGQ 可调)。
 规则来源：方案 §16.1——重复数据保留信号×时间项；单独信号主效应通常只反映
-水平差异，不解释为变化速度。失败处理：公式/列名错误 → 退出 2；拟合异常
-（不收敛/奇异）→ 不中止，全文记入 lme4_model.txt 并在 log 标注，由研究者
-决定弃用与否（解释边界：随机方差→0 表示该效应不可识别，不是无变异）。
+水平差异，不解释为变化速度。失败处理：公式/列名/ddf 取值错误 → 退出 2；
+拟合异常（不收敛/奇异）→ 不中止，全文记入 lme4_model.txt 且 status 块显式
+标注，由研究者决定弃用与否（解释边界：随机方差→0 表示该效应不可识别，
+不是无变异）。
 seed 供 bootstrap；n_boot>0 时追加 bootstrap 固定效应 CI 列（默认 0 不跑）。
 """
 timeout_secs = 7200
