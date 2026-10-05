@@ -2,7 +2,7 @@ schema_version = 1
 plugin_name = "lme4"
 
 [image]
-reference = "localhost/autonomics/lme4-r@sha256:e224e7fa972342afafac184edad050bd7aec48d8cc206ddf5be1cd30e9d7e18d"
+reference = "ghcr.io/zj-2002/lme4-r@sha256:084479ed5409c42fbbcf630ce44f06a35d0e47ae22e40b185fcd453aeb09f88c"
 tag = "v1"
 upstream = "rocker/r-ver 4.4.1 + lme4/lmerTest/pbkrtest/broom.mixed/emmeans (P3M binaries)"
 license = "GPL-2.0|GPL-3.0"
